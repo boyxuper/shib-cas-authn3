@@ -31,32 +31,32 @@ import java.util.Set;
  * @author jgasper@unicon.net
  */
 public class AuthenticatedNameTranslator implements CasToShibTranslator {
-    private final Logger logger = LoggerFactory.getLogger(AuthenticatedNameTranslator.class);
+    private Logger logger = LoggerFactory.getLogger(ShibcasAuthServlet.class);
 
     @Override
     public void doTranslation(final HttpServletRequest request, final HttpServletResponse response,
-                              final Assertion assertion, final String authenticationKey) {
+                              final Assertion assertion) {
         if (assertion == null || assertion.getPrincipal() == null) {
             logger.error("No valid assertion or principal could be found to translate");
             return;
         }
-        final AttributePrincipal casPrincipal = assertion.getPrincipal();
+        AttributePrincipal casPrincipal = assertion.getPrincipal();
         logger.debug("principalName found and being passed on: {}", casPrincipal.getName());
 
         // Pass authenticated principal back to IdP to finish its part of authentication request processing
-        final Collection<IdPAttributePrincipal> assertionAttributes = produceIdpAttributePrincipal(assertion.getAttributes());
-        final Collection<IdPAttributePrincipal> principalAttributes = produceIdpAttributePrincipal(casPrincipal.getAttributes());
-
+        Collection<IdPAttributePrincipal> assertionAttributes = produceIdpAttributePrincipal(assertion.getAttributes());
+        Collection<IdPAttributePrincipal> principalAttributes = produceIdpAttributePrincipal(casPrincipal.getAttributes());
+        
         if (!assertionAttributes.isEmpty() || !principalAttributes.isEmpty()) {
             logger.debug("Found attributes from CAS. Processing...");
-            final Set<Principal> principals = new HashSet<>();
-
+            Set<Principal> principals = new HashSet<>();
+            
             principals.addAll(assertionAttributes);
             principals.addAll(principalAttributes);
             principals.add(new UsernamePrincipal(casPrincipal.getName()));
 
             request.setAttribute(ExternalAuthentication.SUBJECT_KEY, new Subject(false, principals,
-                Collections.emptySet(), Collections.emptySet()));
+                    Collections.emptySet(), Collections.emptySet()));
             logger.info("Created an IdP subject instance with principals containing attributes for {} ", casPrincipal.getName());
 
         } else {
@@ -76,12 +76,12 @@ public class AuthenticatedNameTranslator implements CasToShibTranslator {
     }
 
 
-    private Collection<IdPAttributePrincipal> produceIdpAttributePrincipal(final Map<String, Object> casAttributes) {
-        final Set<IdPAttributePrincipal> principals = new HashSet<>();
+    private Collection<IdPAttributePrincipal> produceIdpAttributePrincipal(Map<String, Object> casAttributes) {
+        Set<IdPAttributePrincipal> principals = new HashSet<>();
         for (final Map.Entry<String, Object> entry : casAttributes.entrySet()) {
-            final IdPAttribute attr = new IdPAttribute(entry.getKey());
+            IdPAttribute attr = new IdPAttribute(entry.getKey());
 
-            final List<StringAttributeValue> attributeValues = new ArrayList<>();
+            List<StringAttributeValue> attributeValues = new ArrayList<>();
             if (entry.getValue() instanceof Collection) {
                 for (final Object value : (Collection) entry.getValue()) {
                     attributeValues.add(new StringAttributeValue(value.toString()));

@@ -14,10 +14,10 @@ import java.net.URLEncoder;
  * @author jgasper@unicon.net
  */
 public class EntityIdParameterBuilder implements IParameterBuilder {
-    private final Logger logger = LoggerFactory.getLogger(EntityIdParameterBuilder.class);
+    private Logger logger = LoggerFactory.getLogger(EntityIdParameterBuilder.class);
 
     @Override
-    public String getParameterString(final HttpServletRequest request, final String authenticationKey) {
+    public String getParameterString(final HttpServletRequest request) {
         return getParameterString(request, true);
     }
 
@@ -29,7 +29,7 @@ public class EntityIdParameterBuilder implements IParameterBuilder {
         if (encode == true) {
             try {
                 rpId = URLEncoder.encode(relayingPartyId, "UTF-8");
-            } catch (final UnsupportedEncodingException e) {
+            } catch (UnsupportedEncodingException e) {
                 logger.error("Error encoding the relying party id.", e);
             }
         } else {
