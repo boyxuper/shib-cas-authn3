@@ -1,8 +1,12 @@
+#### shib-oauth
+修改 cas 插件以支持 OAuth 对接。
+
+此插件只能支持 shibboleth 3.4.3 以下版本。
+
 配置所需附件可以从 release 中或者点此[下载](https://github.com/shanghai-edu/shib-cas-authn3/releases/download/3.2.4-oauth/3.2.4-oauth-bundle.zip)
 
-**具体配置：**
-
-（1）新建文件夹，获取并拷贝相关文件：
+#### 具体配置
+##### 新建文件夹，获取并拷贝相关文件：
 
 ```
 [root@www ~]# wget https://github.com/shanghai-edu/shib-cas-authn3/releases/tag/3.2.4-oauth
@@ -31,11 +35,7 @@ cp shib-cas-authenticator-3.2.4-oauth.jar /opt/shibboleth-idp/edit-webapp/WEB-IN
 cp cas-client-core-3.4.1.jar /opt/shibboleth-idp/edit-webapp/WEB-INF/lib/cas-client-core-3.4.1.jar
 ```
 
-
-
-
-
-（2）配置web.xml：
+##### 配置web.xml：
 
 ```
 [root@www ~]# cp /opt/shibboleth-idp/dist/webapp/WEB-INF/web.xml /opt/shibboleth-idp/edit-webapp/WEB-INF/web.xml
@@ -55,9 +55,11 @@ cp cas-client-core-3.4.1.jar /opt/shibboleth-idp/edit-webapp/WEB-INF/lib/cas-cli
      </servlet-mapping>
 ```
 
-（3）配置idp.properties：
-
+##### 配置idp.properties：
+```
 [root@www ~]# vi /opt/shibboleth-idp/conf/idp.properties
+```
+
 ```
 # 修改
 
@@ -77,10 +79,10 @@ shibcas.oauth2redirecturi = https://xxx.xxx.xxx/idp/Authn/ExtOauth2?conversation
 # 新增
 
 shibcas.oauth2redirecturiBase = https://xxx.xxx.xxx.xxx/idp/Authn/ExtOauth2
-shibcas.oauth2principalname =  uid
+shibcas.oauth2principalname =  uid # oauth 释放属性中，作为用户名输入的那个字段。这个字段必须存在，不然会报错
 ```
 
-（4）配置general-authn.xml：
+##### 配置general-authn.xml：
 
 ```
 [root@www ~]# vi /opt/shibboleth-idp/conf/authn/general-authn.xml
@@ -93,7 +95,8 @@ shibcas.oauth2principalname =  uid
                  p:nonBrowserSupported="false" />
 ```
 
-（5）配置属性释放，用以下内容替换/opt/shibboleth-idp/conf/attribute-resolver.xml文件：
+##### 配置属性释放
+`xsi:type="SubjectDerivedAttribute"` 为从插件中获取属性的配置，例如下面的示例表示，从 OAuth 中获取的 role 属性，映射为 shibboleth 中的 eduPersonScopedAffiliation
 
 ```
 <?xml version="1.0" encoding="UTF-8"?>
@@ -102,42 +105,15 @@ shibcas.oauth2principalname =  uid
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
          xsi:schemaLocation="urn:mace:shibboleth:2.0:resolver http://shibboleth.net/schema/idp/shibboleth-attribute-resolver.xsd">
 
-
-
-
-   <AttributeDefinition xsi:type="SubjectDerivedAttribute" id="uid" principalAttributeName="OpenId" >
-        <AttributeEncoder xsi:type="SAML1String" name="urn:mace:dir:attribute-def:uid" encodeType="false" />
-        <AttributeEncoder xsi:type="SAML2String" name="urn:oid:2.5.4.2" friendlyName="uid" encodeType="false" />
+   <AttributeDefinition xsi:type="SubjectDerivedAttribute" id="eduPersonScopedAffiliation" principalAttributeName="role" >
+        <AttributeEncoder xsi:type="SAML1String" name="urn:mace:dir:attribute-def:eduPersonScopedAffiliation" encodeType="false" />
+        <AttributeEncoder xsi:type="SAML2String" name="urn:oid:1.3.6.1.4.1.5923.1.1.1.9" friendlyName="eduPersonScopedAffiliation" encodeType="false" />
    </AttributeDefinition>
-
-
-   <AttributeDefinition xsi:type="SubjectDerivedAttribute" id="cn" principalAttributeName="DisplayName">
-        <AttributeEncoder xsi:type="SAML1String" name="urn:mace:dir:attribute-def:cn" encodeType="false" />
-        <AttributeEncoder xsi:type="SAML2String" name="urn:oid:2.5.4.3" friendlyName="cn" encodeType="false" />
-   </AttributeDefinition>
-
-   <AttributeDefinition xsi:type="Simple" id="domainName">
-        <InputDataConnector ref="staticAttributes" attributeNames="domainName"/>
-        <AttributeEncoder xsi:type="SAML1String" name="urn:mace:dir:attribute-def:domainName" encodeType="false" />
-        <AttributeEncoder xsi:type="SAML2String" name="urn:oid:2.5.4.5" friendlyName="domainName" encodeType="false" />
-   </AttributeDefinition>
-
-
-   <AttributeDefinition xsi:type="SubjectDerivedAttribute" id="typeOf" principalAttributeName="Role">
-        <AttributeEncoder xsi:type="SAML1String" name="urn:mace:dir:attribute-def:typeOf" encodeType="false" />
-        <AttributeEncoder xsi:type="SAML2String" name="urn:oid:2.5.4.100.2" friendlyName="typeOf" encodeType="false" />
-    </AttributeDefinition>
-
-     <DataConnector id="staticAttributes" xsi:type="Static">
-          <Attribute id="domainName">
-               <Value>pte.sh.cn</Value>
-          </Attribute>
-     </DataConnector>   
 
 </AttributeResolver>
 ```
 
-（6）重新编译war文件，并且重启tomcat：
+##### 重新编译war文件，并且重启tomcat：
 
 ```
 [root@www ~]# cd /opt/shibboleth-idp/bin
