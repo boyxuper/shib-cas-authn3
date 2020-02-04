@@ -1,8 +1,10 @@
 **具体配置：**
 
-（1）新建文件夹并拷贝相关文件：
+（1）新建文件夹，获取并拷贝相关文件：
 
 ```
+[root@www ~]# wget https://github.com/zyfzsi/shib-cas-authn3/releases/download/3.2.4-oauth/3.2.4-oauth-bundle.zip
+[root@www ~]# unzip 3.2.4-oauth-bundle.zip
 [root@www ~]# mkdir /opt/shibboleth-idp/flows/authn/Shiboauth2
 ```
 
