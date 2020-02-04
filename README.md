@@ -1,9 +1,11 @@
+配置所需附件可以从 release 中或者点此[下载](https://github.com/shanghai-edu/shib-cas-authn3/releases/download/3.2.4-oauth/3.2.4-oauth-bundle.zip)
+
 **具体配置：**
 
 （1）新建文件夹，获取并拷贝相关文件：
 
 ```
-[root@www ~]# wget https://github.com/zyfzsi/shib-cas-authn3/releases/download/3.2.4-oauth/3.2.4-oauth-bundle.zip
+[root@www ~]# wget https://github.com/shanghai-edu/shib-cas-authn3/releases/tag/3.2.4-oauth
 [root@www ~]# unzip 3.2.4-oauth-bundle.zip
 [root@www ~]# mkdir /opt/shibboleth-idp/flows/authn/Shiboauth2
 ```
