@@ -13,7 +13,7 @@
 
 ​        把附件中的no-conversation-state.jsp放入/opt/shibboleth-idp/edit-webapp中。
 
-​        把附件中的shib-cas-authenticator-3.2.4.jar、cas-client-core-3.4.1.jar放入/opt/shibboleth-idp/edit-webapp/WEB-INF/lib中。
+​        把附件中的shib-cas-authenticator-3.2.4-oauth.jar、cas-client-core-3.4.1.jar放入/opt/shibboleth-idp/edit-webapp/WEB-INF/lib中。
 
 ​        如shibboleth路径为默认（/opt/shibboleth-idp），可以在附件根目录使用如下命令
 
@@ -24,7 +24,7 @@ cp shibcas-authn-flow.xml /opt/shibboleth-idp/flows/authn/Shiboauth2/shibcas-aut
 
 cp no-conversation-state.jsp /opt/shibboleth-idp/edit-webapp/no-conversation-state.jsp
 
-cp shib-cas-authenticator-3.2.4.jar /opt/shibboleth-idp/edit-webapp/WEB-INF/lib/shib-cas-authenticator-3.2.4.jar
+cp shib-cas-authenticator-3.2.4-oauth.jar /opt/shibboleth-idp/edit-webapp/WEB-INF/lib/shib-cas-authenticator-3.2.4.jar
 
 cp cas-client-core-3.4.1.jar /opt/shibboleth-idp/edit-webapp/WEB-INF/lib/cas-client-core-3.4.1.jar
 ```
