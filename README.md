@@ -13,10 +13,11 @@
 
 以下假定 `IDP_HOME` = `/opt/shibboleth-idp/`
 #### 直接安装
-首先确保 IdP 是 3.4.6 以上版本​
+首先确保 IdP 是 3.4.6 以上版​
 - 把下载的 `no-conversation-state.jsp` 放入 `/opt/shibboleth-idp/edit-webapp` 中
 - 把下载的 `cas-client-core-3.6.0.jar` 和 `shib-cas-authenticator-3.3.0-oauth.jar` 放入 `/opt/shibboleth-idp/edit-webapp/WEB-INF/lib` 中
 - 修改 `web.xml` 增加以下部分
+
 ```
 ...
     <!-- Servlet for receiving a callback from an external CAS Server and continues the IdP login flow -->
@@ -32,6 +33,7 @@
 ...
 ```
 - 修改 `idp.properties` 配置文件
+
 ```
 idp.authn.flows=External
 # 新增
@@ -64,6 +66,7 @@ shibcas.oauth2principalname =  uid
 #### 从 3.2.4-oauth 升级
 首先确认 idp 已经升级到 3.4.6
 - 修改 `web.xml` ，调整为如下
+
 ```
 ...
     <!-- Servlet for receiving a callback from an external CAS Server and continues the IdP login flow -->
@@ -80,6 +83,7 @@ shibcas.oauth2principalname =  uid
 ```
 - 修改 `idp.properties` 配置文件，将 flow 修改为 External  `idp.authn.flows=External` 
 - 删除 `/opt/shibboleth-idp/conf/authn/general-authn.xml` 中新增的 bean 内容，例如：
+
 ```
 <bean id="authn/Shiboauth2" parent="shibboleth.AuthenticationFlow"
                  p:passiveAuthenticationSupported="true"
@@ -93,6 +97,7 @@ shibcas.oauth2principalname =  uid
 #### 属性释放
 
 xsi:type="SubjectDerivedAttribute" 为从插件中获取属性的配置，例如下面的示例表示，从 OAuth 中获取的 role 属性，映射为 shibboleth 中的 eduPersonScopedAffiliation
+
 ```
 <?xml version="1.0" encoding="UTF-8"?>
 <AttributeResolver
