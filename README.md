@@ -13,9 +13,8 @@
 
 以下假定 `IDP_HOME` = `/opt/shibboleth-idp/`
 #### 直接安装
-
-
-​- 把下载的 `no-conversation-state.jsp` 放入 `/opt/shibboleth-idp/edit-webapp` 中
+首先确保 IdP 是 3.4.6 以上版本​
+- 把下载的 `no-conversation-state.jsp` 放入 `/opt/shibboleth-idp/edit-webapp` 中
 - 把下载的 `cas-client-core-3.6.0.jar` 和 `shib-cas-authenticator-3.3.0-oauth.jar` 放入 `/opt/shibboleth-idp/edit-webapp/WEB-INF/lib` 中
 - 修改 `web.xml` 增加以下部分
 ```
