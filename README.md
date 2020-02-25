@@ -9,7 +9,7 @@
 ](https://github.com/shanghai-edu/shib-cas-authn3/releases/download/v3.3.0-oauth/cas-client-core-3.6.0.jar ) 和 [shib-cas-authenticator-3.3.0-oauth.jar
 ](https://github.com/shanghai-edu/shib-cas-authn3/releases/download/v3.3.0-oauth/shib-cas-authenticator-3.3.0-oauth.jar)文件备用。
 
-下载 [no-conversation-state.jsp](https://raw.githubusercontent.com/shanghai-edu/shib-cas-authn3/3.3.0-oauth/IDP_HOME/edit-webapp/no-conversation-state.jsp) 文件备用
+下载 [no-conversation-state.jsp](https://github.com/Unicon/shib-cas-authn3/blob/master/IDP_HOME/edit-webapp/no-conversation-state.jsp) 文件备用
 
 以下假定 `IDP_HOME` = `/opt/shibboleth-idp/`
 #### 直接安装
@@ -32,7 +32,7 @@
     </servlet-mapping>
 ...
 ```
-- 修改 `idp.properties` 配置文件
+- 修改 `idp.properties` 配置文件(大多数情况下只需要修改shibcas.oauth2UrlPrefix，shibcas.serverName，shibcas.oauth2clientid 与shibcas.oauth2clientsecret)
 
 ```
 idp.authn.flows=External
@@ -45,19 +45,19 @@ shibcas.oauth2LoginUrl = ${shibcas.oauth2UrlPrefix}/oauth/v1/authorize?response_
 # idp 的地址
 shibcas.serverName = https://idp.xxx.edu.cn
 # oauth 换取 token 的地址
-shibcas.oauth2TokenUrl = https://oauth.xxx.edu.cn/oauth/v1/token
+shibcas.oauth2TokenUrl = ${shibcas.oauth2UrlPrefix}/oauth/v1/token
 # oauth 获取用户信息的地址
-shibcas.oauth2ResourceUrl = https://oauth.xxx.edu.cn/oauth/v1/userinfo
+shibcas.oauth2ResourceUrl = ${shibcas.oauth2UrlPrefix}/oauth/v1/userinfo
 # oauth 的 client_id
 shibcas.oauth2clientid = testcient
 # oauth 的 client_secret
 shibcas.oauth2clientsecret = testpass
 # redirect uri
-shibcas.oauth2redirecturi = https://idp.xxx.edu.cn/idp/Authn/External?conversation=e1s1
+shibcas.oauth2redirecturi = ${shibcas.serverName}/idp/Authn/External?conversation=e1s1
 
 # 新增
 # redirect uri 的前缀
-shibcas.oauth2redirecturiBase = https://idp.xxx.edu.cn/idp/Authn/External
+shibcas.oauth2redirecturiBase = ${shibcas.serverName}/idp/Authn/External
 # 返回属性中，标识用户名的字段
 shibcas.oauth2principalname =  uid
 ```
