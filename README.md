@@ -16,7 +16,13 @@
 首先确保 IdP 是 3.4.6 以上版​
 - 把下载的 `no-conversation-state.jsp` 放入 `/opt/shibboleth-idp/edit-webapp` 中
 - 把下载的 `cas-client-core-3.6.0.jar` 和 `shib-cas-authenticator-3.3.0-oauth.jar` 放入 `/opt/shibboleth-idp/edit-webapp/WEB-INF/lib` 中
-- 修改 `web.xml` 增加以下部分
+- 将 `/opt/shibboleth-idp/dist/webapp/WEB-INF/web.xml` 拷贝到 `/opt/shibboleth-idp/edit-webapp/WEB-INF/web.xml`
+
+```
+cp /opt/shibboleth-idp/dist/webapp/WEB-INF/web.xml /opt/shibboleth-idp/edit-webapp/WEB-INF/web.xml
+```
+
+- 修改 `/opt/shibboleth-idp/edit-webapp/WEB-INF/web.xml` 增加以下部分
 
 ```
 ...
