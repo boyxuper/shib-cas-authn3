@@ -9,7 +9,7 @@
 ](https://github.com/shanghai-edu/shib-cas-authn3/releases/download/v3.3.0-oauth/cas-client-core-3.6.0.jar ) 和 [shib-cas-authenticator-3.3.0-oauth.jar
 ](https://github.com/shanghai-edu/shib-cas-authn3/releases/download/v3.3.0-oauth/shib-cas-authenticator-3.3.0-oauth.jar)文件备用。
 
-下载 [no-conversation-state.jsp](https://github.com/Unicon/shib-cas-authn3/blob/master/IDP_HOME/edit-webapp/no-conversation-state.jsp) 文件备用
+下载 [no-conversation-state.jsp](https://raw.githubusercontent.com/shanghai-edu/shib-cas-authn3/3.3.0-oauth/IDP_HOME/edit-webapp/no-conversation-state.jsp) 文件备用
 
 以下假定 `IDP_HOME` = `/opt/shibboleth-idp/`
 #### 直接安装
