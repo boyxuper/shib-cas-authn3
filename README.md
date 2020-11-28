@@ -16,7 +16,13 @@
 首先确保 IdP 是 3.4.6 以上版​
 - 把下载的 `no-conversation-state.jsp` 放入 `/opt/shibboleth-idp/edit-webapp` 中
 - 把下载的 `cas-client-core-3.6.0.jar` 和 `shib-cas-authenticator-3.3.0-oauth.jar` 放入 `/opt/shibboleth-idp/edit-webapp/WEB-INF/lib` 中
-- 修改 `web.xml` 增加以下部分
+- 将 `/opt/shibboleth-idp/dist/webapp/WEB-INF/web.xml` 拷贝到 `/opt/shibboleth-idp/edit-webapp/WEB-INF/web.xml`
+
+```
+cp /opt/shibboleth-idp/dist/webapp/WEB-INF/web.xml /opt/shibboleth-idp/edit-webapp/WEB-INF/web.xml
+```
+
+- 修改 `/opt/shibboleth-idp/edit-webapp/WEB-INF/web.xml` 增加以下部分
 
 ```
 ...
@@ -32,7 +38,7 @@
     </servlet-mapping>
 ...
 ```
-- 修改 `idp.properties` 配置文件
+- 修改 `idp.properties` 配置文件(大多数情况下只需要修改shibcas.oauth2UrlPrefix，shibcas.serverName，shibcas.oauth2clientid 与shibcas.oauth2clientsecret)
 
 ```
 idp.authn.flows=External
@@ -45,19 +51,19 @@ shibcas.oauth2LoginUrl = ${shibcas.oauth2UrlPrefix}/oauth/v1/authorize?response_
 # idp 的地址
 shibcas.serverName = https://idp.xxx.edu.cn
 # oauth 换取 token 的地址
-shibcas.oauth2TokenUrl = https://oauth.xxx.edu.cn/oauth/v1/token
+shibcas.oauth2TokenUrl = ${shibcas.oauth2UrlPrefix}/oauth/v1/token
 # oauth 获取用户信息的地址
-shibcas.oauth2ResourceUrl = https://oauth.xxx.edu.cn/oauth/v1/userinfo
+shibcas.oauth2ResourceUrl = ${shibcas.oauth2UrlPrefix}/oauth/v1/userinfo
 # oauth 的 client_id
 shibcas.oauth2clientid = testcient
 # oauth 的 client_secret
 shibcas.oauth2clientsecret = testpass
 # redirect uri
-shibcas.oauth2redirecturi = https://idp.xxx.edu.cn/idp/Authn/External?conversation=e1s1
+shibcas.oauth2redirecturi = ${shibcas.serverName}/idp/Authn/External?conversation=e1s1
 
 # 新增
 # redirect uri 的前缀
-shibcas.oauth2redirecturiBase = https://idp.xxx.edu.cn/idp/Authn/External
+shibcas.oauth2redirecturiBase = ${shibcas.serverName}/idp/Authn/External
 # 返回属性中，标识用户名的字段
 shibcas.oauth2principalname =  uid
 ```
