@@ -28,6 +28,7 @@ configurations.compile.transitive = false
 
 dependencies {
     compile "org.jasig.cas.client:cas-client-core:$project.casClientVersion"
+    compile "com.google.code.gson:gson:$project.gsonVersion"
 
     provided "javax.servlet:javax.servlet-api:$project.servletVersion"
     provided "net.shibboleth.idp:idp-authn-api:$project.shibIdpVersion"

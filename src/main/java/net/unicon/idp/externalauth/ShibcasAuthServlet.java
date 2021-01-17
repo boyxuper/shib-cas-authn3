@@ -1,25 +1,34 @@
 package net.unicon.idp.externalauth;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import net.shibboleth.idp.attribute.IdPAttribute;
+import net.shibboleth.idp.attribute.StringAttributeValue;
 import net.shibboleth.idp.authn.AuthnEventIds;
 import net.shibboleth.idp.authn.ExternalAuthentication;
 import net.shibboleth.idp.authn.ExternalAuthenticationException;
-import net.unicon.idp.authn.provider.extra.EntityIdParameterBuilder;
+import net.shibboleth.idp.authn.principal.IdPAttributePrincipal;
+import net.shibboleth.idp.authn.principal.UsernamePrincipal;
 import net.unicon.idp.authn.provider.extra.IParameterBuilder;
 import org.apache.commons.lang.StringUtils;
+import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.message.BasicNameValuePair;
 import org.jasig.cas.client.util.CommonUtils;
-import org.jasig.cas.client.validation.AbstractCasProtocolUrlBasedTicketValidator;
-import org.jasig.cas.client.validation.Assertion;
-import org.jasig.cas.client.validation.Cas10TicketValidator;
-import org.jasig.cas.client.validation.Cas20ServiceTicketValidator;
-import org.jasig.cas.client.validation.Cas30ServiceTicketValidator;
-import org.jasig.cas.client.validation.TicketValidationException;
+import org.jasig.cas.client.util.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
-import org.springframework.context.EnvironmentAware;
 import org.springframework.core.env.Environment;
 import org.springframework.web.context.WebApplicationContext;
+
+import javax.security.auth.Subject;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -28,45 +37,11 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URLConnection;
-import java.net.URL;
 import java.security.Principal;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.io.PrintWriter;
-import java.io.OutputStreamWriter;
-import java.io.BufferedOutputStream;
-import java.io.DataOutputStream;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.NameValuePair;
-import org.apache.http.message.BasicNameValuePair;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import javax.security.auth.Subject;
-import net.shibboleth.idp.attribute.IdPAttribute;
-import net.shibboleth.idp.attribute.StringAttributeValue;
-import net.shibboleth.idp.authn.principal.IdPAttributePrincipal;
-import net.shibboleth.idp.authn.principal.UsernamePrincipal;
-import org.apache.commons.lang.builder.EqualsBuilder;
-import org.apache.commons.lang.builder.HashCodeBuilder;
-import org.jasig.cas.client.authentication.AttributePrincipal;
-import java.util.HashMap;
 
 
 /**
@@ -94,13 +69,13 @@ public class ShibcasAuthServlet extends HttpServlet {
     private String client_id;
     private String client_secret;
     private String redirect_uri;
-    
+
     //Added
     private String principal_name;
     private String redirect_uri_base;
     //Added End
-    
-    private final Set<IParameterBuilder> parameterBuilders = new HashSet<IParameterBuilder>();
+
+    private final Set<IParameterBuilder> parameterBuilders = new HashSet<>();
 
 
     @Override
@@ -108,7 +83,7 @@ public class ShibcasAuthServlet extends HttpServlet {
         // TODO: We have the opportunity to give back more to Shib than just the PRINCIPAL_NAME_KEY. Identify additional information
         try {
             final String ticket = CommonUtils.safeGetParameter(request, artifactParameterName);
-            
+
             //Added
             final String redirect_uri_conversation = CommonUtils.safeGetParameter(request, serviceParameterName);
             final String redirect_uri_part = "?conversation=" + redirect_uri_conversation;
@@ -123,12 +98,12 @@ public class ShibcasAuthServlet extends HttpServlet {
 
             if ((ticket == null || ticket.isEmpty()) && (gatewayAttempted == null || gatewayAttempted.isEmpty())) {
                 logger.debug("ticket and gatewayAttempted are not set; initiating oauth2 login redirect");
-                
+
                 // Added
                 //startLoginRequest(request, response, force, passive, authenticationKey);
-                startLoginRequest(request, response, force, passive, authenticationKey,redirect_uri_part);
+                startLoginRequest(request, response, force, passive, authenticationKey, redirect_uri_part);
                 //Added End
-                
+
                 return;
             }
 
@@ -147,21 +122,19 @@ public class ShibcasAuthServlet extends HttpServlet {
         } catch (final Exception e) {
             logger.error("Something unexpected happened", e);
             request.setAttribute(ExternalAuthentication.AUTHENTICATION_ERROR_KEY, AuthnEventIds.AUTHN_EXCEPTION);
-         }
+        }
     }
 
     private void validatevalidateoauth2(final HttpServletRequest request, final HttpServletResponse response, final String redirect_uri_in, final String ticket, final String authenticationKey, final boolean force) throws ExternalAuthenticationException, IOException {
-
-        String result = "";
         String uid = "";
 
-        Map<String, Object> attributes = new HashMap();
-        
+        Map<String, Object> attributes = new HashMap<>();
+
         // Added
         // String token = getToken(ticket);
         String token = getToken(redirect_uri_in, ticket);
         //Added END
-        
+
         try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
             HttpPost conn = new HttpPost(resourceurl);
             conn.setHeader("User-Agent", "Mozilla/4.0 (compatible; MSIE 5.0; Windows NT; DigExt)");
@@ -169,103 +142,84 @@ public class ShibcasAuthServlet extends HttpServlet {
             params.add(new BasicNameValuePair("access_token", token));
             conn.setEntity(new UrlEncodedFormEntity(params));
             HttpResponse respon = client.execute(conn);
-            BufferedReader bufReader = new BufferedReader(new InputStreamReader(respon.getEntity().getContent()));
-            String line;
-            while ((line = bufReader.readLine()) != null) {
-                 result = result + line;
+
+            String result = IOUtils.readString(respon.getEntity().getContent());
+            JsonObject json = JsonParser.parseString(result).getAsJsonObject();
+            if(!json.has(this.principal_name) || !json.get(this.principal_name).isJsonPrimitive()) {
+                throw new Exception(String.format(
+                    "unable to locate principal_name as `%s` in oauth resource_url `%s` response: \n%s",
+                    this.principal_name, this.resourceurl, result
+                ));
             }
-            
-            Pattern p = Pattern.compile("\"(.*?)\"");
-            Matcher m = p.matcher(result);
-            int count=0;
-            String temp="";
-            while (m.find())
-            {
-              if(count==1){
-                  
-                // Added
-                //if(temp.equals("uid")){
-                if(temp.equals(principal_name)){
-                   uid = m.group(1);
-                // Added End
-                
+
+            uid = json.get(this.principal_name).getAsString();
+
+            for(Entry<String, JsonElement> entry : json.entrySet()) {
+                if(entry.getValue().isJsonPrimitive()) {
+                    String value = entry.getValue().getAsJsonPrimitive().getAsString();
+                    if (!value.isEmpty()) {
+                        attributes.put(entry.getKey(), value);
+                    }
                 }
-                if (!m.group(1).equals("")){
-                   attributes.put(temp,m.group(1)); 
-                }
-                
-                count=0;
-                continue;
-              }
-              
-              if(count==0){
-                temp = m.group(1);
-                count = 1;
-                continue;
-              }
             }
-        }catch (Exception e){
-          this.logger.error("error in wapaction,and e is " + e.getMessage());
+        } catch (Exception e) {
+            this.logger.error("error in wapaction,and e is " + e.getMessage(), e);
         }
         Collection<IdPAttributePrincipal> assertionAttributes = produceIdpAttributePrincipal(attributes);
-        
-        if (!assertionAttributes.isEmpty()){
-          Set<Principal> principals = new HashSet();
-          principals.addAll(assertionAttributes);
-          principals.add(new UsernamePrincipal(uid));
-          request.setAttribute(ExternalAuthentication.SUBJECT_KEY, new Subject(false, principals, Collections.emptySet(), Collections.emptySet()));
-        }else{
-          request.setAttribute(ExternalAuthentication.PRINCIPAL_NAME_KEY, uid);
+
+        if (!assertionAttributes.isEmpty()) {
+            Set<Principal> principals = new HashSet<>();
+            principals.addAll(assertionAttributes);
+            principals.add(new UsernamePrincipal(uid));
+            request.setAttribute(ExternalAuthentication.SUBJECT_KEY, new Subject(false, principals, Collections.emptySet(), Collections.emptySet()));
+        } else {
+            request.setAttribute(ExternalAuthentication.PRINCIPAL_NAME_KEY, uid);
         }
 
         ExternalAuthentication.finishExternalAuthentication(authenticationKey, request, response);
     }
 
 
-    private String getToken(String redirect_uri_in, String code){
-        String token="";
+    private String getToken(String redirect_uri_in, String code) {
+        String token = "";
         try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
-          HttpPost conn = new HttpPost(oauth2tokenurl);
-          conn.setHeader("User-Agent", "Mozilla/4.0 (compatible; MSIE 5.0; Windows NT; DigExt)");
-          List<NameValuePair> params = new ArrayList<NameValuePair>(2);
-          params.add(new BasicNameValuePair("grant_type", "authorization_code"));
-          params.add(new BasicNameValuePair("code", code));
-          params.add(new BasicNameValuePair("client_id", client_id));
-          params.add(new BasicNameValuePair("client_secret", client_secret));
-          
-          //Added
-          // params.add(new BasicNameValuePair("redirect_uri", redirect_uri));
-          params.add(new BasicNameValuePair("redirect_uri", redirect_uri_in));
-          //Added END
-          
-          conn.setEntity(new UrlEncodedFormEntity(params));
-          HttpResponse respon = client.execute(conn);
-          BufferedReader bufReader = new BufferedReader(new InputStreamReader(respon.getEntity().getContent()));
-          String line;
-          String result="";
-          while ((line = bufReader.readLine()) != null) {
-              result = result + line;
-          }
-          Pattern p = Pattern.compile("\"(.*?)\"");
-          Matcher m = p.matcher(result);
-          int count=0;
-          while (m.find())
-          {
-            if(count==1){
-              token = m.group(1);
-              count=0;
-            }
-            if(m.group(1).equals("access_token")){
-              count=1;
-            }
-          }
-      }catch (Exception e){
-        this.logger.error("error in wapaction,and e is " + e.getMessage());
-      }
+            HttpPost conn = new HttpPost(oauth2tokenurl);
+            conn.setHeader("User-Agent", "Mozilla/4.0 (compatible; MSIE 5.0; Windows NT; DigExt)");
+            List<NameValuePair> params = new ArrayList<NameValuePair>(2);
+            params.add(new BasicNameValuePair("grant_type", "authorization_code"));
+            params.add(new BasicNameValuePair("code", code));
+            params.add(new BasicNameValuePair("client_id", client_id));
+            params.add(new BasicNameValuePair("client_secret", client_secret));
 
-      return token;
+            //Added
+            // params.add(new BasicNameValuePair("redirect_uri", redirect_uri));
+            params.add(new BasicNameValuePair("redirect_uri", redirect_uri_in));
+            //Added END
 
-  }
+            conn.setEntity(new UrlEncodedFormEntity(params));
+            HttpResponse response = client.execute(conn);
+            String result = IOUtils.readString(response.getEntity().getContent());
+
+            logger.warn("original response: {} {} {}", oauth2tokenurl, params, result);
+            Pattern p = Pattern.compile("\"(.*?)\"");
+            Matcher m = p.matcher(result);
+            int count = 0;
+            while (m.find()) {
+                if (count == 1) {
+                    token = m.group(1);
+                    count = 0;
+                }
+                if (m.group(1).equals("access_token")) {
+                    count = 1;
+                }
+            }
+        } catch (Exception e) {
+            this.logger.error("error in wapaction,and e is " + e.getMessage(), e);
+        }
+
+        return token;
+
+    }
 
     private Collection<IdPAttributePrincipal> produceIdpAttributePrincipal(final Map<String, Object> casAttributes) {
         final Set<IdPAttributePrincipal> principals = new HashSet<>();
@@ -285,21 +239,21 @@ public class ShibcasAuthServlet extends HttpServlet {
                 logger.debug("Added attribute {} with values {}", entry.getKey(), entry.getValue());
                 principals.add(new IdPAttributePrincipal(attr));
             } else {
-                logger.warn("Skipped attribute {} since it contains no values", entry.getKey());                                                
-             }
+                logger.warn("Skipped attribute {} since it contains no values", entry.getKey());
+            }
         }
         return principals;
     }
 
 
     protected void startLoginRequest(final HttpServletRequest request, final HttpServletResponse response,
-    
-    //Added
-    //final Boolean force, final Boolean passive, String authenticationKey) {
-    final Boolean force, final Boolean passive, String authenticationKey, final String redirect_uri_part ) {
-    //Added End
-    
-    // CAS Protocol - http://www.jasig.org/cas/protocol indicates not setting gateway if renew has been set.
+
+                                     //Added
+                                     //final Boolean force, final Boolean passive, String authenticationKey) {
+                                     final Boolean force, final Boolean passive, String authenticationKey, final String redirect_uri_part) {
+        //Added End
+
+        // CAS Protocol - http://www.jasig.org/cas/protocol indicates not setting gateway if renew has been set.
         // we will set both and let CAS sort it out, but log a warning
         if (Boolean.TRUE.equals(passive) && Boolean.TRUE.equals(force)) {
             logger.warn("Both FORCE AUTHN and PASSIVE AUTHN were set to true, please verify that the requesting system has been properly configured.");
@@ -309,10 +263,10 @@ public class ShibcasAuthServlet extends HttpServlet {
             if (passive) {
                 serviceUrl += "&gatewayAttempted=true";
             }
-            
+
             //Added
-             //final String loginUrl = constructRedirectUrl(serviceUrl, force, passive) + getAdditionalParameters(request, authenticationKey);
-            final String loginUrl = constructRedirectUrl(serviceUrl, force, passive) + getAdditionalParameters(request, authenticationKey) +  redirect_uri_part;
+            //final String loginUrl = constructRedirectUrl(serviceUrl, force, passive) + getAdditionalParameters(request, authenticationKey);
+            final String loginUrl = constructRedirectUrl(serviceUrl, force, passive) + getAdditionalParameters(request, authenticationKey) + redirect_uri_part;
             //Added End
 
             logger.debug("loginUrl: {}", loginUrl);
@@ -326,7 +280,7 @@ public class ShibcasAuthServlet extends HttpServlet {
      * Uses the CAS CommonUtils to build the CAS Redirect URL.
      */
     private String constructRedirectUrl(final String serviceUrl, final boolean renew, final boolean gateway) {
-        return CommonUtils.constructRedirectUrl(casLoginUrl, "redirect_uri", serviceUrl, renew, gateway , null);
+        return CommonUtils.constructRedirectUrl(casLoginUrl, "redirect_uri", serviceUrl, renew, gateway, null);
     }
 
     /**
@@ -339,7 +293,7 @@ public class ShibcasAuthServlet extends HttpServlet {
         final StringBuilder builder = new StringBuilder();
         for (final IParameterBuilder paramBuilder : parameterBuilders) {
             builder.append(paramBuilder.getParameterString(request, authenticationKey));
-          }
+        }
         return builder.toString();
     }
 
@@ -392,7 +346,7 @@ public class ShibcasAuthServlet extends HttpServlet {
         principal_name = environment.getRequiredProperty("shibcas.oauth2principalname");
         logger.debug("shibcas.oauth2principalname: {}", principal_name);
         //Added End
-        
+
     }
 
     private void buildParameterBuilders(final ApplicationContext applicationContext) {
@@ -420,7 +374,7 @@ public class ShibcasAuthServlet extends HttpServlet {
      */
     protected String constructServiceUrl(final HttpServletRequest request, final HttpServletResponse response) {
         String serviceUrl = CommonUtils.constructServiceUrl(request, response, null, serverName,
-            serviceParameterName, artifactParameterName, true);
+                serviceParameterName, artifactParameterName, true);
 
 /*        if ("embed".equalsIgnoreCase(entityIdLocation)) {
             serviceUrl += (new EntityIdParameterBuilder().getParameterString(request, false));
@@ -436,8 +390,8 @@ public class ShibcasAuthServlet extends HttpServlet {
      */
     protected String constructServiceUrl(final HttpServletRequest request, final HttpServletResponse response, final boolean isValidatingTicket) {
         return isValidatingTicket
-            ? CommonUtils.constructServiceUrl(request, response, null, serverName, serviceParameterName, artifactParameterName, true)
-            : constructServiceUrl(request, response);
+                ? CommonUtils.constructServiceUrl(request, response, null, serverName, serviceParameterName, artifactParameterName, true)
+                : constructServiceUrl(request, response);
     }
 
     private void loadErrorPage(final HttpServletRequest request, final HttpServletResponse response) {
