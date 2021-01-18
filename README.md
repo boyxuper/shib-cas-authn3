@@ -59,11 +59,7 @@ shibcas.oauth2clientid = testcient
 # oauth 的 client_secret
 shibcas.oauth2clientsecret = testpass
 # redirect uri
-shibcas.oauth2redirecturi = ${shibcas.serverName}/idp/Authn/External?conversation=e1s1
-
-# 新增
-# redirect uri 的前缀
-shibcas.oauth2redirecturiBase = ${shibcas.serverName}/idp/Authn/External
+shibcas.oauth2redirecturi = ${shibcas.serverName}/idp/Authn/External
 # 返回属性中，标识用户名的字段
 shibcas.oauth2principalname =  uid
 ```
