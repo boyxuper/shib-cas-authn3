@@ -57,6 +57,7 @@ public class ShibcasAuthServlet extends HttpServlet {
     private final Logger logger = LoggerFactory.getLogger(ShibcasAuthServlet.class);
     private static final long serialVersionUID = 1L;
     private static final String artifactParameterName = "code";
+    private static final String stateParameterName = "state";
 
     private String casLoginUrl;
     private String serverName;
@@ -82,9 +83,8 @@ public class ShibcasAuthServlet extends HttpServlet {
             final String ticket = CommonUtils.safeGetParameter(request, artifactParameterName);
 
             //Added
-            final String redirect_uri_conversation = CommonUtils.safeGetParameter(request, ExternalAuthentication.CONVERSATION_KEY);
-            final String redirect_uri_part = "?conversation=" + redirect_uri_conversation;
-            final String redirect_uri_in = redirect_uri_base + redirect_uri_part;
+            final String conversationId = CommonUtils.safeGetParameter(request, ExternalAuthentication.CONVERSATION_KEY);
+            final String redirect_uri_in = redirect_uri_base + "?conversation=" + conversationId;
             // Added End
 
             final String gatewayAttempted = CommonUtils.safeGetParameter(request, "gatewayAttempted");
@@ -98,7 +98,7 @@ public class ShibcasAuthServlet extends HttpServlet {
 
                 // Added
                 //startLoginRequest(request, response, force, passive, authenticationKey);
-                startLoginRequest(request, response, force, passive, authenticationKey, redirect_uri_part);
+                startLoginRequest(request, response, force, passive, authenticationKey, conversationId);
                 //Added End
 
                 return;
@@ -244,10 +244,7 @@ public class ShibcasAuthServlet extends HttpServlet {
 
 
     protected void startLoginRequest(final HttpServletRequest request, final HttpServletResponse response,
-
-                                     //Added
-                                     //final Boolean force, final Boolean passive, String authenticationKey) {
-                                     final Boolean force, final Boolean passive, String authenticationKey, final String redirect_uri_part) {
+                                     final Boolean force, final Boolean passive, String authenticationKey, final String conversationId) {
         //Added End
 
         // CAS Protocol - http://www.jasig.org/cas/protocol indicates not setting gateway if renew has been set.
@@ -261,10 +258,8 @@ public class ShibcasAuthServlet extends HttpServlet {
                 serviceUrl += "&gatewayAttempted=true";
             }
 
-            //Added
-            //final String loginUrl = constructRedirectUrl(serviceUrl, force, passive) + getAdditionalParameters(request, authenticationKey);
-            final String loginUrl = constructRedirectUrl(serviceUrl, force, passive) + getAdditionalParameters(request, authenticationKey) + redirect_uri_part;
-            //Added End
+            String loginUrl = constructRedirectUrl(serviceUrl, force, passive) + getAdditionalParameters(request, authenticationKey);
+            loginUrl += "&" + stateParameterName + "=" + conversationId;
 
             logger.debug("loginUrl: {}", loginUrl);
             response.sendRedirect(loginUrl);
