@@ -57,9 +57,6 @@ public class ShibcasAuthServlet extends HttpServlet {
     private final Logger logger = LoggerFactory.getLogger(ShibcasAuthServlet.class);
     private static final long serialVersionUID = 1L;
     private static final String artifactParameterName = "code";
-    //
-    //private static final String serviceParameterName = "redirect_uri";
-    private static final String serviceParameterName = "conversation";
 
     private String casLoginUrl;
     private String serverName;
@@ -85,7 +82,7 @@ public class ShibcasAuthServlet extends HttpServlet {
             final String ticket = CommonUtils.safeGetParameter(request, artifactParameterName);
 
             //Added
-            final String redirect_uri_conversation = CommonUtils.safeGetParameter(request, serviceParameterName);
+            final String redirect_uri_conversation = CommonUtils.safeGetParameter(request, ExternalAuthentication.CONVERSATION_KEY);
             final String redirect_uri_part = "?conversation=" + redirect_uri_conversation;
             final String redirect_uri_in = redirect_uri_base + redirect_uri_part;
             // Added End
@@ -374,7 +371,7 @@ public class ShibcasAuthServlet extends HttpServlet {
      */
     protected String constructServiceUrl(final HttpServletRequest request, final HttpServletResponse response) {
         String serviceUrl = CommonUtils.constructServiceUrl(request, response, null, serverName,
-                serviceParameterName, artifactParameterName, true);
+                ExternalAuthentication.CONVERSATION_KEY, artifactParameterName, true);
 
 /*        if ("embed".equalsIgnoreCase(entityIdLocation)) {
             serviceUrl += (new EntityIdParameterBuilder().getParameterString(request, false));
@@ -390,7 +387,7 @@ public class ShibcasAuthServlet extends HttpServlet {
      */
     protected String constructServiceUrl(final HttpServletRequest request, final HttpServletResponse response, final boolean isValidatingTicket) {
         return isValidatingTicket
-                ? CommonUtils.constructServiceUrl(request, response, null, serverName, serviceParameterName, artifactParameterName, true)
+                ? CommonUtils.constructServiceUrl(request, response, null, serverName, ExternalAuthentication.CONVERSATION_KEY, artifactParameterName, true)
                 : constructServiceUrl(request, response);
     }
 
