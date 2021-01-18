@@ -110,6 +110,20 @@ public class ShibcasAuthServlet extends HttpServlet {
                 ExternalAuthentication.finishExternalAuthentication(authenticationKey, request, response);
                 return;
             }
+
+            // fast leave OAuth2 Server site & conversation restore
+            final String state = CommonUtils.safeGetParameter(request, stateParameterName);
+            if (!StringUtils.isEmpty(state)) {
+                String redirectUrl = String.format(
+                    "%s?%s=%s&%s=%s",
+                    this.redirect_uri_base,
+                    ExternalAuthentication.CONVERSATION_KEY, state,
+                    ShibcasAuthServlet.artifactParameterName, ticket
+                );
+                response.sendRedirect(redirectUrl);
+                return;
+            }
+
             validatevalidateoauth2(request, response, redirect_uri_in, ticket, authenticationKey, force);
 
         } catch (final ExternalAuthenticationException e) {
