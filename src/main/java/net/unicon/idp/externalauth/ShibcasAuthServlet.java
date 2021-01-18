@@ -70,7 +70,6 @@ public class ShibcasAuthServlet extends HttpServlet {
 
     //Added
     private String principal_name;
-    private String redirect_uri_base;
     //Added End
 
     private final Set<IParameterBuilder> parameterBuilders = new HashSet<>();
@@ -84,7 +83,6 @@ public class ShibcasAuthServlet extends HttpServlet {
 
             //Added
             final String conversationId = CommonUtils.safeGetParameter(request, ExternalAuthentication.CONVERSATION_KEY);
-            final String redirect_uri_in = redirect_uri_base + "?conversation=" + conversationId;
             // Added End
 
             // fast leave OAuth2 Server site & conversation restore
@@ -123,7 +121,7 @@ public class ShibcasAuthServlet extends HttpServlet {
                 return;
             }
 
-            validatevalidateoauth2(request, response, redirect_uri_in, ticket, authenticationKey, force);
+            validatevalidateoauth2(request, response, ticket, authenticationKey, force);
 
         } catch (final ExternalAuthenticationException e) {
             logger.warn("Error processing oauth2 authentication request", e);
@@ -135,15 +133,11 @@ public class ShibcasAuthServlet extends HttpServlet {
         }
     }
 
-    private void validatevalidateoauth2(final HttpServletRequest request, final HttpServletResponse response, final String redirect_uri_in, final String ticket, final String authenticationKey, final boolean force) throws ExternalAuthenticationException, IOException {
+    private void validatevalidateoauth2(final HttpServletRequest request, final HttpServletResponse response, final String ticket, final String authenticationKey, final boolean force) throws ExternalAuthenticationException, IOException {
         String uid = "";
 
         Map<String, Object> attributes = new HashMap<>();
-
-        // Added
-        // String token = getToken(ticket);
-        String token = getToken(redirect_uri_in, ticket);
-        //Added END
+        String token = getToken(ticket);
 
         try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
             HttpPost conn = new HttpPost(resourceurl);
@@ -190,7 +184,7 @@ public class ShibcasAuthServlet extends HttpServlet {
     }
 
 
-    private String getToken(String redirect_uri_in, String code) {
+    private String getToken(String code) {
         String token = "";
         try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
             HttpPost conn = new HttpPost(oauth2tokenurl);
@@ -200,11 +194,7 @@ public class ShibcasAuthServlet extends HttpServlet {
             params.add(new BasicNameValuePair("code", code));
             params.add(new BasicNameValuePair("client_id", client_id));
             params.add(new BasicNameValuePair("client_secret", client_secret));
-
-            //Added
-            // params.add(new BasicNameValuePair("redirect_uri", redirect_uri));
-            params.add(new BasicNameValuePair("redirect_uri", redirect_uri_in));
-            //Added END
+            params.add(new BasicNameValuePair("redirect_uri", redirect_uri));
 
             conn.setEntity(new UrlEncodedFormEntity(params));
             HttpResponse response = client.execute(conn);
@@ -343,10 +333,6 @@ public class ShibcasAuthServlet extends HttpServlet {
 
         redirect_uri = environment.getRequiredProperty("shibcas.oauth2redirecturi");
         logger.debug("shibcas.oauth2redirecturi: {}", redirect_uri);
-
-        //Added
-        redirect_uri_base = environment.getRequiredProperty("shibcas.oauth2redirecturiBase");
-        logger.debug("shibcas.oauth2redirecturiBase: {}", redirect_uri_base);
 
         principal_name = environment.getRequiredProperty("shibcas.oauth2principalname");
         logger.debug("shibcas.oauth2principalname: {}", principal_name);
