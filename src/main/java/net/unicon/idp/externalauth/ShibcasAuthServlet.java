@@ -1,8 +1,6 @@
 package net.unicon.idp.externalauth;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import net.shibboleth.idp.attribute.IdPAttribute;
 import net.shibboleth.idp.attribute.StringAttributeValue;
 import net.shibboleth.idp.authn.AuthnEventIds;
@@ -40,8 +38,6 @@ import java.io.IOException;
 import java.security.Principal;
 import java.util.*;
 import java.util.Map.Entry;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 
 /**
@@ -60,11 +56,10 @@ public class ShibcasAuthServlet extends HttpServlet {
     private static final String stateParameterName = "state";
     private static final String ACCESS_TOKEN_KEY = "access_token";
 
-    private String casLoginUrl;
+    private String oauth2LoginUrl;
     private String serverName;
-    private String casServerPrefix;
-    private String oauth2tokenurl;
-    private String resourceurl;
+    private String oauth2TokenUrl;
+    private String oauth2ResourceUrl;
     private String client_id;
     private String client_secret;
     private String redirect_uri;
@@ -77,7 +72,7 @@ public class ShibcasAuthServlet extends HttpServlet {
 
 
     @Override
-    protected void doGet(final HttpServletRequest request, final HttpServletResponse response) throws ServletException {
+    protected void doGet(final HttpServletRequest request, final HttpServletResponse response) throws ServletException, IOException {
         // TODO: We have the opportunity to give back more to Shib than just the PRINCIPAL_NAME_KEY. Identify additional information
         try {
             final String ticket = CommonUtils.safeGetParameter(request, artifactParameterName);
@@ -122,8 +117,7 @@ public class ShibcasAuthServlet extends HttpServlet {
                 return;
             }
 
-            validatevalidateoauth2(request, response, ticket, authenticationKey, force);
-
+            authenticateByOAuth2(request, response, ticket, authenticationKey);
         } catch (final ExternalAuthenticationException e) {
             logger.warn("Error processing oauth2 authentication request", e);
             loadErrorPage(request, response);
@@ -134,86 +128,80 @@ public class ShibcasAuthServlet extends HttpServlet {
         }
     }
 
-    private void validatevalidateoauth2(final HttpServletRequest request, final HttpServletResponse response, final String ticket, final String authenticationKey, final boolean force) throws ExternalAuthenticationException, IOException {
-        String uid = "";
+    private void authenticateByOAuth2(
+            final HttpServletRequest request, final HttpServletResponse response,
+            final String ticket, final String authenticationKey) throws Exception {
+
+        String accessToken = fetchAccessToken(ticket);
+
+        List<NameValuePair> params = Collections.singletonList(new BasicNameValuePair("access_token", accessToken));
+        JsonObject json = fetchJSON(this.oauth2ResourceUrl, params);
+        if(!json.has(this.principal_name) || !json.get(this.principal_name).isJsonPrimitive()) {
+            throw new Exception(String.format(
+                "unable to locate principal_name as `%s` in oauth resource_url `%s` response: \n%s",
+                this.principal_name, this.oauth2ResourceUrl, json.toString()
+            ));
+        }
+
+        String principleName = json.get(this.principal_name).getAsString();
 
         Map<String, Object> attributes = new HashMap<>();
-        String token = getToken(ticket);
-
-        try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
-            HttpPost conn = new HttpPost(resourceurl);
-            conn.setHeader("User-Agent", "Mozilla/4.0 (compatible; MSIE 5.0; Windows NT; DigExt)");
-            List<NameValuePair> params = new ArrayList<NameValuePair>(2);
-            params.add(new BasicNameValuePair("access_token", token));
-            conn.setEntity(new UrlEncodedFormEntity(params));
-            HttpResponse respon = client.execute(conn);
-
-            String result = IOUtils.readString(respon.getEntity().getContent());
-            logger.info("original response: {} {} {}", resourceurl, params, result);
-
-            JsonObject json = JsonParser.parseString(result).getAsJsonObject();
-            if(!json.has(this.principal_name) || !json.get(this.principal_name).isJsonPrimitive()) {
-                throw new Exception(String.format(
-                    "unable to locate principal_name as `%s` in oauth resource_url `%s` response: \n%s",
-                    this.principal_name, this.resourceurl, result
-                ));
-            }
-
-            uid = json.get(this.principal_name).getAsString();
-
-            for(Entry<String, JsonElement> entry : json.entrySet()) {
-                if(entry.getValue().isJsonPrimitive()) {
-                    String value = entry.getValue().getAsJsonPrimitive().getAsString();
-                    if (!value.isEmpty()) {
-                        attributes.put(entry.getKey(), value);
-                    }
+        for(Entry<String, JsonElement> entry : json.entrySet()) {
+            if(entry.getValue().isJsonPrimitive()) {
+                String value = entry.getValue().getAsJsonPrimitive().getAsString();
+                if (!value.isEmpty()) {
+                    attributes.put(entry.getKey(), value);
                 }
             }
-        } catch (Exception e) {
-            this.logger.error("error in wapaction,and e is " + e.getMessage(), e);
         }
+
         Collection<IdPAttributePrincipal> assertionAttributes = produceIdpAttributePrincipal(attributes);
 
         if (!assertionAttributes.isEmpty()) {
             Set<Principal> principals = new HashSet<>();
             principals.addAll(assertionAttributes);
-            principals.add(new UsernamePrincipal(uid));
+            principals.add(new UsernamePrincipal(principleName));
             request.setAttribute(ExternalAuthentication.SUBJECT_KEY, new Subject(false, principals, Collections.emptySet(), Collections.emptySet()));
         } else {
-            request.setAttribute(ExternalAuthentication.PRINCIPAL_NAME_KEY, uid);
+            request.setAttribute(ExternalAuthentication.PRINCIPAL_NAME_KEY, principleName);
         }
 
         ExternalAuthentication.finishExternalAuthentication(authenticationKey, request, response);
     }
 
-    private String getToken(String code) {
-        try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
-            HttpPost conn = new HttpPost(oauth2tokenurl);
-            conn.setHeader("User-Agent", "Mozilla/4.0 (compatible; MSIE 5.0; Windows NT; DigExt)");
-            List<NameValuePair> params = new ArrayList<NameValuePair>(2);
-            params.add(new BasicNameValuePair("grant_type", "authorization_code"));
-            params.add(new BasicNameValuePair("code", code));
-            params.add(new BasicNameValuePair("client_id", client_id));
-            params.add(new BasicNameValuePair("client_secret", client_secret));
-            params.add(new BasicNameValuePair("redirect_uri", redirect_uri));
+    private String fetchAccessToken(String code) throws Exception {
+        List<NameValuePair> params = new ArrayList<>(5);
+        params.add(new BasicNameValuePair("grant_type", "authorization_code"));
+        params.add(new BasicNameValuePair("code", code));
+        params.add(new BasicNameValuePair("client_id", client_id));
+        params.add(new BasicNameValuePair("client_secret", client_secret));
+        params.add(new BasicNameValuePair("redirect_uri", redirect_uri));
 
+        JsonObject json = fetchJSON(this.oauth2TokenUrl, params);
+        if(!json.has(ShibcasAuthServlet.ACCESS_TOKEN_KEY) || !json.get(ShibcasAuthServlet.ACCESS_TOKEN_KEY).isJsonPrimitive()) {
+            throw new Exception(String.format(
+                    "unable to locate access_token as `%s` in oauth2tokenurl `%s` response: \n%s",
+                    ShibcasAuthServlet.ACCESS_TOKEN_KEY, this.oauth2TokenUrl, json.toString()
+            ));
+        }
+
+        return json.get(ShibcasAuthServlet.ACCESS_TOKEN_KEY).getAsString();
+    }
+
+    private JsonObject fetchJSON(String url, List<NameValuePair> params) throws Exception {
+        try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
+            HttpPost conn = new HttpPost(url);
+            conn.setHeader("User-Agent", "Mozilla/4.0 (compatible; MSIE 5.0; Windows NT; DigExt)");
             conn.setEntity(new UrlEncodedFormEntity(params));
+
             HttpResponse response = client.execute(conn);
             String result = IOUtils.readString(response.getEntity().getContent());
-            logger.info("original response: {} {} {}", oauth2tokenurl, params, result);
+            logger.info("original response: {} {} {}", oauth2TokenUrl, params, result);
 
-            JsonObject json = JsonParser.parseString(result).getAsJsonObject();
-            if(!json.has(ShibcasAuthServlet.ACCESS_TOKEN_KEY) || !json.get(ShibcasAuthServlet.ACCESS_TOKEN_KEY).isJsonPrimitive()) {
-                throw new Exception(String.format(
-                        "unable to locate access_token as `%s` in oauth2tokenurl `%s` response: \n%s",
-                        ShibcasAuthServlet.ACCESS_TOKEN_KEY, this.oauth2tokenurl, result
-                ));
-            }
-
-            return json.get(ShibcasAuthServlet.ACCESS_TOKEN_KEY).getAsString();
+            return JsonParser.parseString(result).getAsJsonObject();
         } catch (Exception e) {
-            this.logger.error("error in wapaction,and e is " + e.getMessage(), e);
-            return "";
+            this.logger.error("fetchJSON failed [{}], {}, {}", url, e.getMessage(), e);
+            throw e;
         }
     }
 
@@ -271,7 +259,7 @@ public class ShibcasAuthServlet extends HttpServlet {
      * Uses the CAS CommonUtils to build the CAS Redirect URL.
      */
     private String constructRedirectUrl(final String serviceUrl, final boolean renew, final boolean gateway) {
-        return CommonUtils.constructRedirectUrl(casLoginUrl, "redirect_uri", serviceUrl, renew, gateway, null);
+        return CommonUtils.constructRedirectUrl(oauth2LoginUrl, "redirect_uri", serviceUrl, renew, gateway, null);
     }
 
     /**
@@ -306,20 +294,17 @@ public class ShibcasAuthServlet extends HttpServlet {
     private void parseProperties(final Environment environment) {
         logger.debug("reading properties from the idp.properties file");
 
-        casServerPrefix = environment.getRequiredProperty("shibcas.oauth2UrlPrefix");
-        logger.debug("shibcas.oauth2UrlPrefix: {}", casServerPrefix);
-
-        casLoginUrl = environment.getRequiredProperty("shibcas.oauth2LoginUrl");
-        logger.debug("shibcas.oauth2LoginUrl: {}", casLoginUrl);
+        oauth2LoginUrl = environment.getRequiredProperty("shibcas.oauth2LoginUrl");
+        logger.debug("shibcas.oauth2LoginUrl: {}", oauth2LoginUrl);
 
         serverName = environment.getRequiredProperty("shibcas.serverName");
         logger.debug("shibcas.serverName: {}", serverName);
 
-        oauth2tokenurl = environment.getRequiredProperty("shibcas.oauth2TokenUrl");
-        logger.debug("shibcas.oauth2TokenUrl: {}", oauth2tokenurl);
+        oauth2TokenUrl = environment.getRequiredProperty("shibcas.oauth2TokenUrl");
+        logger.debug("shibcas.oauth2TokenUrl: {}", oauth2TokenUrl);
 
-        resourceurl = environment.getRequiredProperty("shibcas.oauth2ResourceUrl");
-        logger.debug("shibcas.oauth2ResourceUrl: {}", resourceurl);
+        oauth2ResourceUrl = environment.getRequiredProperty("shibcas.oauth2ResourceUrl");
+        logger.debug("shibcas.oauth2ResourceUrl: {}", oauth2ResourceUrl);
 
         client_id = environment.getRequiredProperty("shibcas.oauth2clientid");
         logger.debug("shibcas.oauth2clientid: {}", client_id);
