@@ -58,6 +58,7 @@ public class ShibcasAuthServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private static final String artifactParameterName = "code";
     private static final String stateParameterName = "state";
+    private static final String ACCESS_TOKEN_KEY = "access_token";
 
     private String casLoginUrl;
     private String serverName;
@@ -148,6 +149,8 @@ public class ShibcasAuthServlet extends HttpServlet {
             HttpResponse respon = client.execute(conn);
 
             String result = IOUtils.readString(respon.getEntity().getContent());
+            logger.info("original response: {} {} {}", resourceurl, params, result);
+
             JsonObject json = JsonParser.parseString(result).getAsJsonObject();
             if(!json.has(this.principal_name) || !json.get(this.principal_name).isJsonPrimitive()) {
                 throw new Exception(String.format(
@@ -183,9 +186,7 @@ public class ShibcasAuthServlet extends HttpServlet {
         ExternalAuthentication.finishExternalAuthentication(authenticationKey, request, response);
     }
 
-
     private String getToken(String code) {
-        String token = "";
         try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
             HttpPost conn = new HttpPost(oauth2tokenurl);
             conn.setHeader("User-Agent", "Mozilla/4.0 (compatible; MSIE 5.0; Windows NT; DigExt)");
@@ -199,26 +200,21 @@ public class ShibcasAuthServlet extends HttpServlet {
             conn.setEntity(new UrlEncodedFormEntity(params));
             HttpResponse response = client.execute(conn);
             String result = IOUtils.readString(response.getEntity().getContent());
+            logger.info("original response: {} {} {}", oauth2tokenurl, params, result);
 
-            logger.warn("original response: {} {} {}", oauth2tokenurl, params, result);
-            Pattern p = Pattern.compile("\"(.*?)\"");
-            Matcher m = p.matcher(result);
-            int count = 0;
-            while (m.find()) {
-                if (count == 1) {
-                    token = m.group(1);
-                    count = 0;
-                }
-                if (m.group(1).equals("access_token")) {
-                    count = 1;
-                }
+            JsonObject json = JsonParser.parseString(result).getAsJsonObject();
+            if(!json.has(ShibcasAuthServlet.ACCESS_TOKEN_KEY) || !json.get(ShibcasAuthServlet.ACCESS_TOKEN_KEY).isJsonPrimitive()) {
+                throw new Exception(String.format(
+                        "unable to locate access_token as `%s` in oauth2tokenurl `%s` response: \n%s",
+                        ShibcasAuthServlet.ACCESS_TOKEN_KEY, this.oauth2tokenurl, result
+                ));
             }
+
+            return json.get(ShibcasAuthServlet.ACCESS_TOKEN_KEY).getAsString();
         } catch (Exception e) {
             this.logger.error("error in wapaction,and e is " + e.getMessage(), e);
+            return "";
         }
-
-        return token;
-
     }
 
     private Collection<IdPAttributePrincipal> produceIdpAttributePrincipal(final Map<String, Object> casAttributes) {
