@@ -87,11 +87,23 @@ public class ShibcasAuthServlet extends HttpServlet {
             final String redirect_uri_in = redirect_uri_base + "?conversation=" + conversationId;
             // Added End
 
+            // fast leave OAuth2 Server site & conversation restore
+            final String state = CommonUtils.safeGetParameter(request, stateParameterName);
+            if (!StringUtils.isEmpty(state) && !StringUtils.isEmpty(ticket)) {
+                String redirectUrl = String.format(
+                        "%s?%s=%s&%s=%s",
+                        this.redirect_uri,
+                        ExternalAuthentication.CONVERSATION_KEY, state,
+                        ShibcasAuthServlet.artifactParameterName, ticket
+                );
+                response.sendRedirect(redirectUrl);
+                return;
+            }
+
             final String gatewayAttempted = CommonUtils.safeGetParameter(request, "gatewayAttempted");
             final String authenticationKey = ExternalAuthentication.startExternalAuthentication(request);
             final boolean force = Boolean.parseBoolean(request.getAttribute(ExternalAuthentication.FORCE_AUTHN_PARAM).toString());
             final boolean passive = Boolean.parseBoolean(request.getAttribute(ExternalAuthentication.PASSIVE_AUTHN_PARAM).toString());
-
 
             if ((ticket == null || ticket.isEmpty()) && (gatewayAttempted == null || gatewayAttempted.isEmpty())) {
                 logger.debug("ticket and gatewayAttempted are not set; initiating oauth2 login redirect");
@@ -108,19 +120,6 @@ public class ShibcasAuthServlet extends HttpServlet {
                 logger.debug("Gateway/Passive returned no ticket, returning NoPassive.");
                 request.setAttribute(ExternalAuthentication.AUTHENTICATION_ERROR_KEY, AuthnEventIds.NO_PASSIVE);
                 ExternalAuthentication.finishExternalAuthentication(authenticationKey, request, response);
-                return;
-            }
-
-            // fast leave OAuth2 Server site & conversation restore
-            final String state = CommonUtils.safeGetParameter(request, stateParameterName);
-            if (!StringUtils.isEmpty(state)) {
-                String redirectUrl = String.format(
-                    "%s?%s=%s&%s=%s",
-                    this.redirect_uri_base,
-                    ExternalAuthentication.CONVERSATION_KEY, state,
-                    ShibcasAuthServlet.artifactParameterName, ticket
-                );
-                response.sendRedirect(redirectUrl);
                 return;
             }
 
