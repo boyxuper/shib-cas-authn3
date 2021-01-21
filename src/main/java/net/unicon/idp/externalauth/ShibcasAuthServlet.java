@@ -90,7 +90,8 @@ public class ShibcasAuthServlet extends HttpServlet {
                         ExternalAuthentication.CONVERSATION_KEY, state,
                         ShibcasAuthServlet.artifactParameterName, ticket
                 );
-                response.sendRedirect(redirectUrl);
+                response.setContentType("text/html");
+                response.getWriter().format("<meta http-equiv=\"refresh\" content=\"0;url=%s\"><h5>Waiting for RichCtrl IdP...</h5>", redirectUrl);
                 return;
             }
 
@@ -137,7 +138,7 @@ public class ShibcasAuthServlet extends HttpServlet {
         List<NameValuePair> params = Collections.singletonList(new BasicNameValuePair("access_token", accessToken));
         JsonObject json = fetchJSON(this.oauth2ResourceUrl, params);
         if(!json.has(this.principal_name) || !json.get(this.principal_name).isJsonPrimitive()) {
-            throw new Exception(String.format(
+            throw new ExternalAuthenticationException(String.format(
                 "unable to locate principal_name as `%s` in oauth resource_url `%s` response: \n%s",
                 this.principal_name, this.oauth2ResourceUrl, json.toString()
             ));
@@ -179,7 +180,7 @@ public class ShibcasAuthServlet extends HttpServlet {
 
         JsonObject json = fetchJSON(this.oauth2TokenUrl, params);
         if(!json.has(ShibcasAuthServlet.ACCESS_TOKEN_KEY) || !json.get(ShibcasAuthServlet.ACCESS_TOKEN_KEY).isJsonPrimitive()) {
-            throw new Exception(String.format(
+            throw new ExternalAuthenticationException(String.format(
                     "unable to locate access_token as `%s` in oauth2tokenurl `%s` response: \n%s",
                     ShibcasAuthServlet.ACCESS_TOKEN_KEY, this.oauth2TokenUrl, json.toString()
             ));
