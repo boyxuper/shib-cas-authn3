@@ -1,6 +1,8 @@
 package net.unicon.idp.externalauth;
 
-import com.google.gson.*;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import net.shibboleth.idp.attribute.IdPAttribute;
 import net.shibboleth.idp.attribute.StringAttributeValue;
 import net.shibboleth.idp.authn.AuthnEventIds;
@@ -13,7 +15,10 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicNameValuePair;
@@ -35,6 +40,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.net.URI;
 import java.security.Principal;
 import java.util.*;
 import java.util.Map.Entry;
@@ -134,9 +140,10 @@ public class ShibcasAuthServlet extends HttpServlet {
             final String ticket, final String authenticationKey) throws Exception {
 
         String accessToken = fetchAccessToken(ticket);
-
-        List<NameValuePair> params = Collections.singletonList(new BasicNameValuePair("access_token", accessToken));
-        JsonObject json = fetchJSON(this.oauth2ResourceUrl, params);
+        URI url = new URIBuilder(this.oauth2ResourceUrl)
+                .setParameter("access_token", accessToken)
+                .build();
+        JsonObject json = fetchJSON(new HttpGet(url));
         if(!json.has(this.principal_name) || !json.get(this.principal_name).isJsonPrimitive()) {
             throw new ExternalAuthenticationException(String.format(
                 "unable to locate principal_name as `%s` in oauth resource_url `%s` response: \n%s",
@@ -178,7 +185,10 @@ public class ShibcasAuthServlet extends HttpServlet {
         params.add(new BasicNameValuePair("client_secret", client_secret));
         params.add(new BasicNameValuePair("redirect_uri", redirect_uri));
 
-        JsonObject json = fetchJSON(this.oauth2TokenUrl, params);
+        HttpPost request = new HttpPost(this.oauth2TokenUrl);
+        request.setEntity(new UrlEncodedFormEntity(params));
+
+        JsonObject json = fetchJSON(request);
         if(!json.has(ShibcasAuthServlet.ACCESS_TOKEN_KEY) || !json.get(ShibcasAuthServlet.ACCESS_TOKEN_KEY).isJsonPrimitive()) {
             throw new ExternalAuthenticationException(String.format(
                     "unable to locate access_token as `%s` in oauth2tokenurl `%s` response: \n%s",
@@ -189,19 +199,17 @@ public class ShibcasAuthServlet extends HttpServlet {
         return json.get(ShibcasAuthServlet.ACCESS_TOKEN_KEY).getAsString();
     }
 
-    private JsonObject fetchJSON(String url, List<NameValuePair> params) throws Exception {
+    private JsonObject fetchJSON(HttpUriRequest request) throws Exception {
         try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
-            HttpPost conn = new HttpPost(url);
-            conn.setHeader("User-Agent", "Mozilla/4.0 (compatible; MSIE 5.0; Windows NT; DigExt)");
-            conn.setEntity(new UrlEncodedFormEntity(params));
+            request.setHeader("User-Agent", "Mozilla/4.0 (compatible; MSIE 5.0; Windows NT; DigExt)");
 
-            HttpResponse response = client.execute(conn);
+            HttpResponse response = client.execute(request);
             String result = IOUtils.readString(response.getEntity().getContent());
-            logger.info("original response: {} {} {}", oauth2TokenUrl, params, result);
+            logger.info("original response: {} {}", request.getURI().toString(), result);
 
             return JsonParser.parseString(result).getAsJsonObject();
         } catch (Exception e) {
-            this.logger.error("fetchJSON failed [{}], {}, {}", url, e.getMessage(), e);
+            this.logger.error("fetchJSON failed [{}], {}, {}", request.getURI().toString(), e.getMessage(), e);
             throw e;
         }
     }
